@@ -119,7 +119,19 @@ Compiled modules carry references rather than values, and raise a correction
 block above the notes when they contain a superseded parameter. Respect it: the
 correction is current, the note prose is historical.
 
-## 6. Ground rules
+## 6. No model service is required
+
+kc2 makes **no outbound network calls** on the default path. There is no
+inference endpoint to configure, no server to start, and no API key to supply.
+You are the distiller and you are the adjudicator — that is the whole design.
+
+If you find `ADJUDICATOR_BASE_URL` or a port number in `kc2/config.py`, those are
+inert unless someone explicitly sets `KC_ADJUDICATOR_MODE=api` or
+`KC_EMBED_API_MODEL`. Do not go looking for a model server; nothing is missing.
+`tests/test_no_network.py` enforces this by failing if any default operation
+opens a socket.
+
+## 7. Ground rules
 
 - **Clinical text stays on this machine.** Distil with your own reasoning. Do not
   send transcripts or notes to any external service.
@@ -130,7 +142,7 @@ correction is current, the note prose is historical.
 - **Ambiguity is surfaced, not resolved silently.** When the system asks you to
   decide, decide — that is the design, not a failure.
 
-## 7. Layout
+## 8. Layout
 
 ```
 kc2/        the system

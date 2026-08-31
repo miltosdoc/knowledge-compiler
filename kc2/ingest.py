@@ -50,6 +50,9 @@ def adjudicate(a_title: str, a_body: str, b_title: str, b_body: str) -> bool | N
     import json
     import urllib.request
 
+    if not config.ADJUDICATOR_MODEL:
+        return None  # nothing configured; caller keeps threshold behaviour
+
     payload = {
         "model": config.ADJUDICATOR_MODEL,
         "messages": [

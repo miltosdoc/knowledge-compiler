@@ -263,9 +263,11 @@ made months later by chance.
 
 ## 7. Open items requiring the operator
 
-1. **Rotate the API key.** `sk-02ff…a364` is live in a public repo since the initial commit
-   and in `~/.hermes/config.yaml`. Rotate at xsilico, then purge history with
-   `git filter-repo` — deleting the line in a later commit does not remove the blob.
+1. **Rotate the API key.** The v1 modules hardcoded a live xsilico key, which was
+   public from the initial commit and is also present in `~/.hermes/config.yaml`.
+   The v2 root commit discarded that history and no key appears anywhere in this
+   repository, but the credential itself must still be rotated at the provider —
+   discarding history reduces exposure, it does not end it.
 2. **Approve `pip install sentence-transformers`** (+ `bge-small-en-v1.5`, ~130 MB, CPU) to
    enable the dense half of hybrid retrieval.
 3. **Ship the Mac mini `vault/`** — `atomic/` is the irreplaceable part; `raw/` only if

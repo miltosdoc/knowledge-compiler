@@ -64,19 +64,15 @@ class OpenAICompatEmbedder(Embedder):
     name = "openai-compatible"
 
     def __init__(self, base_url: str | None = None, model: str | None = None):
-        self.base_url = (base_url or config.BASE_URL).rstrip("/")
-        self.model = model or "text-embedding-3-small"
-        self.available = self._probe()
-
-    def _probe(self) -> bool:
-        try:
-            import urllib.request  # noqa: PLC0415
-
-            req = urllib.request.Request(f"{self.base_url}/embeddings", method="OPTIONS")
-            with urllib.request.urlopen(req, timeout=2):
-                return True
-        except Exception:
-            return False
+        # Opt-in only. Without an explicitly configured model this backend is
+        # never constructed and never probed, so the default path makes no
+        # network call at all.
+        self.model = model or config.EMBED_API_MODEL
+        if not self.model:
+            self.available = False
+            return
+        self.base_url = (base_url or config.EMBED_API_BASE_URL).rstrip("/")
+        self.available = True
 
     def encode(self, texts: Sequence[str]) -> list[list[float]]:
         import json  # noqa: PLC0415
@@ -88,7 +84,7 @@ class OpenAICompatEmbedder(Embedder):
             data=body,
             headers={
                 "Content-Type": "application/json",
-                "Authorization": f"Bearer {config.API_KEY}",
+                "Authorization": f"Bearer {config.EMBED_API_KEY}",
             },
         )
         with urllib.request.urlopen(req, timeout=60) as r:
@@ -108,6 +104,8 @@ def get_embedder(refresh: bool = False) -> Embedder:
     global _CACHED
     if _CACHED is not None and not refresh:
         return _CACHED
+    # Order matters: the local encoder first, and the remote one only when a
+    # model has been named explicitly.
     for factory in (SentenceTransformerEmbedder, OpenAICompatEmbedder):
         try:
             e = factory()

@@ -190,3 +190,82 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
+
+# --- concept memory: the vault as a compounding graph -----------------------
+
+_store = None
+
+
+def _s():
+    global _store
+    if _store is None:
+        from .config import VAULT_DIR  # noqa: PLC0415
+        from .ingest import ConceptStore  # noqa: PLC0415
+
+        _store = ConceptStore(VAULT_DIR / "concepts")
+    return _store
+
+
+def concept_candidates(title: str, content: str = "", limit: int = 5) -> str:
+    """Which existing concepts is this observation closest to?
+
+    Call before adding anything, to see whether the vault already holds it."""
+    return _dump(
+        {
+            "query": title,
+            "candidates": [
+                {"id": cid, "title": _s().concepts[cid].title,
+                 "similarity": round(score, 3),
+                 "strength": _s().concepts[cid].strength}
+                for score, cid in _s().nearest(title, content, n=limit)
+            ],
+        }
+    )
+
+
+def concept_ingest(
+    title: str, content: str, source: str, observed_on: str = "", detail: str = ""
+) -> str:
+    """Add an observation to the vault, merging into an existing concept when it
+    already exists.
+
+    Returns action "merge", "link", "create", or "ambiguous". On "ambiguous" the
+    server deliberately does not guess: decide from the candidates and then call
+    `concept_merge`, or `concept_ingest` again once you have chosen a title."""
+    r = _s().ingest(title, content, source, observed_on or None, detail)
+    return _dump(
+        {
+            "action": r.action,
+            "concept_id": r.concept_id,
+            "matched": r.matched,
+            "similarity": round(r.score, 3),
+            "candidates": r.candidates,
+            "next": (
+                "Same concept? call concept_merge. Different? call concept_ingest "
+                "with a distinct title."
+            )
+            if r.action == "ambiguous"
+            else None,
+        }
+    )
+
+
+def concept_merge(keep_id: str, absorb_id: str) -> str:
+    """Fold one concept into another, keeping both names findable as aliases."""
+    ok = _s().merge(keep_id, absorb_id)
+    return _dump(
+        {"merged": ok, "keep": keep_id, "absorbed": absorb_id,
+         "strength": _s().concepts[keep_id].strength if ok else None}
+    )
+
+
+def concept_compounding() -> str:
+    """Is the vault compounding, or merely accumulating?
+
+    Evidence per concept should rise as encounters accrue. If concept count grows
+    in step with transcripts, knowledge is being appended rather than integrated."""
+    return _dump(_s().compounding())
+
+
+TOOLS += [concept_candidates, concept_ingest, concept_merge, concept_compounding]

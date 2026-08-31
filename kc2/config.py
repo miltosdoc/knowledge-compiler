@@ -29,6 +29,19 @@ MODEL = os.getenv("KC_MODEL", "qwen3.8-flash-next")
 # Never hardcode a key. Absent is fine for a local llama-server with no --api-key.
 API_KEY = os.getenv("KC_API_KEY") or os.getenv("XSILICO_API_KEY") or "sk-local"
 
+# Concept-identity adjudication.
+#   "harness" - return candidates and let the calling agent decide (default).
+#               An MCP server already has a capable model driving it; calling a
+#               second one over the network is slower, weaker, and sends clinical
+#               text off the machine for no gain.
+#   "api"     - headless batch ingestion, where no agent is in the loop.
+#   "none"    - thresholds only.
+ADJUDICATOR_MODE = os.getenv("KC_ADJUDICATOR_MODE", "harness")
+ADJUDICATOR_BASE_URL = os.getenv("KC_ADJUDICATOR_BASE_URL", BASE_URL)
+ADJUDICATOR_MODEL = os.getenv("KC_ADJUDICATOR_MODEL", MODEL)
+ADJUDICATOR_KEY = os.getenv("KC_ADJUDICATOR_KEY") or API_KEY
+ADJUDICATOR_TIMEOUT = int(os.getenv("KC_ADJUDICATOR_TIMEOUT", "60"))
+
 MAX_PROMPT_TOKENS = int(os.getenv("KC_MAX_PROMPT_TOKENS", "8000"))
 CHARS_PER_TOKEN = 4
 

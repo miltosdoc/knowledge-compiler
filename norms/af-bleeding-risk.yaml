@@ -1,0 +1,21 @@
+id: norm:af-bleeding-risk
+current: Modifiable bleeding risk factor assessment
+authority: ESC 2024 Guidelines for the management of atrial fibrillation
+valid_from: 2024-08-30
+last_verified: 2026-08-31
+volatility: 12mo
+aliases:
+  - HAS-BLED
+  - bleeding risk score
+thresholds:
+  use: "Identify and correct modifiable bleeding risk factors; schedule review"
+  do_not: "A bleeding score must NOT be used to withhold or discontinue oral anticoagulation"
+supersedes:
+  - name: HAS-BLED-guided anticoagulation withholding
+    until: 2020-08-29
+    migration: >-
+      A high bleeding score triggers correction of modifiable factors and
+      closer follow-up - never omission of indicated anticoagulation.
+notes: >-
+  Modifiable factors include uncontrolled hypertension, concomitant antiplatelet
+  or NSAID use, excess alcohol, and labile INR on a VKA.

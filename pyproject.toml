@@ -1,0 +1,26 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "knowledge-compiler"
+version = "2.0.0"
+description = "Compile a clinician's recorded reasoning into reusable modules, with clinical parameters resolved at read time"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+dependencies = ["PyYAML>=6.0"]
+
+[project.optional-dependencies]
+mcp = ["mcp>=1.0"]
+dense = ["sentence-transformers>=3.0"]
+dev = ["pytest>=8.0"]
+
+[project.scripts]
+kc2 = "kc2.cli:main"
+
+[tool.setuptools]
+packages = ["kc2"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

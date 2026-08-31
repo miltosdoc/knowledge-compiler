@@ -1,0 +1,29 @@
+id: norm:ldl-target
+current: ESC/EAS 2019 risk-stratified LDL-C targets
+authority: ESC/EAS 2019 Guidelines for the management of dyslipidaemias
+valid_from: 2019-08-31
+last_verified: 2026-08-31
+volatility: 12mo
+aliases:
+  - LDL target
+  - LDL-C goal
+thresholds:
+  very_high_risk: "<1.4 mmol/L (55 mg/dL) AND >=50% reduction from baseline"
+  high_risk: "<1.8 mmol/L (70 mg/dL) AND >=50% reduction from baseline"
+  moderate_risk: "<2.6 mmol/L (100 mg/dL)"
+  low_risk: "<3.0 mmol/L (116 mg/dL)"
+supersedes:
+  - name: LDL below 2.6 mmol/L as an aggressive target
+    until: 2019-08-31
+    migration: >-
+      2.6 mmol/L is the MODERATE-risk target. For established ASCVD, diabetes
+      with target-organ damage, or otherwise very-high-risk patients the target
+      is <1.4 mmol/L. Describing 2.6 as "aggressive lipid management" in a
+      cardiology population understates the goal by a full risk category.
+  - name: LDL below 1.8 mmol/L for very high risk
+    until: 2019-08-31
+    migration: The very-high-risk target moved from <1.8 to <1.4 mmol/L.
+notes: >-
+  Recurrent events within 2 years on maximally tolerated statin may warrant
+  <1.0 mmol/L. Targets are paired with a percentage-reduction requirement;
+  quoting an absolute number alone is incomplete.

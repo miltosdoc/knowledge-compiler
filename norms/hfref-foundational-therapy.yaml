@@ -1,0 +1,22 @@
+id: norm:hfref-foundational-therapy
+current: Four foundational drug classes for HFrEF
+authority: ESC 2021 HF Guidelines with 2023 focused update
+valid_from: 2021-08-27
+last_verified: 2026-08-31
+volatility: 12mo
+aliases:
+  - four pillars
+  - HFrEF quadruple therapy
+thresholds:
+  applies_to: "LVEF <=40%"
+  classes: "ARNI (or ACE-I) + beta-blocker + MRA + SGLT2 inhibitor, all Class I"
+  sequencing: "Start all four early at low dose and uptitrate; do not sequence one to target before adding the next"
+supersedes:
+  - name: Stepwise ACE-I then beta-blocker then MRA sequencing
+    until: 2021-08-27
+    migration: >-
+      Sequential uptitration to target dose before adding the next class is
+      superseded by rapid initiation of all four classes at low dose.
+notes: >-
+  SGLT2 inhibitors also carry a Class I recommendation across HFmrEF and HFpEF
+  in the 2023 focused update.

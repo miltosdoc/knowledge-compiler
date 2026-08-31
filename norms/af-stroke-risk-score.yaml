@@ -1,0 +1,39 @@
+id: norm:af-stroke-risk-score
+current: CHA2DS2-VA
+authority: ESC 2024 Guidelines for the management of atrial fibrillation
+valid_from: 2024-08-30
+last_verified: 2026-08-31
+volatility: 12mo
+aliases:
+  - CHA2DS2-VA score
+  - AF stroke risk score
+thresholds:
+  oac_recommended: ">=2"        # Class I
+  oac_should_be_considered: "1" # Class IIa
+  oac_omit: "0"
+components:
+  C: Congestive heart failure / LV dysfunction = 1
+  H: Hypertension = 1
+  A2: Age >=75 = 2
+  D: Diabetes mellitus = 1
+  S2: Prior stroke / TIA / thromboembolism = 2
+  V: Vascular disease = 1
+  A: Age 65-74 = 1
+supersedes:
+  - name: CHA2DS2-VASc
+    until: 2024-08-30
+    authority: ESC 2020 / AHA-ACC-HRS 2023
+    migration: >-
+      Drop the sex category (Sc). A woman scoring 1 on sex alone maps to
+      CHA2DS2-VA 0 and is NOT an anticoagulation candidate. Female sex is a
+      risk modifier, not an independent risk factor; it amplifies risk only
+      when another factor is present.
+  - name: CHADS2
+    until: 2010-01-01
+    migration: Superseded by CHA2DS2-VASc, then by CHA2DS2-VA.
+notes: >-
+  Score is dynamic and must be recalculated over time - a patient crosses into
+  the 65-74 age band and gains a point on a birthday. Valvular AF (moderate/
+  severe mitral stenosis or a mechanical prosthesis) sits outside this score
+  entirely and requires a vitamin K antagonist, not a DOAC. Device-detected
+  subclinical AF is a distinct decision (NOAH-AFNET 6, ARTESIA).

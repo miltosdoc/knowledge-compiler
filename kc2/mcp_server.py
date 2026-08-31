@@ -175,10 +175,17 @@ TOOLS = [
 
 
 def create_server():
-    """Build the FastMCP server. Requires the optional ``mcp`` dependency."""
-    from mcp.server.fastmcp import FastMCP  # noqa: PLC0415
+    """Build the MCP server. Requires the optional ``mcp`` dependency.
 
-    server = FastMCP("knowledge-compiler")
+    The SDK renamed FastMCP to MCPServer in 2.x, so both are accepted rather
+    than pinning users to one major version.
+    """
+    try:
+        from mcp.server.mcpserver import MCPServer as _Server  # noqa: PLC0415
+    except ImportError:  # mcp 1.x
+        from mcp.server.fastmcp import FastMCP as _Server  # noqa: PLC0415
+
+    server = _Server("knowledge-compiler")
     for fn in TOOLS:
         server.tool()(fn)
     return server

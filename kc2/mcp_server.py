@@ -207,10 +207,10 @@ _store = None
 def _s():
     global _store
     if _store is None:
-        from .config import VAULT_DIR  # noqa: PLC0415
+        from .config import CONCEPTS_DIR  # noqa: PLC0415
         from .ingest import ConceptStore  # noqa: PLC0415
 
-        _store = ConceptStore(VAULT_DIR / "concepts")
+        _store = ConceptStore(CONCEPTS_DIR)
     return _store
 
 
@@ -280,13 +280,15 @@ TOOLS += [concept_candidates, concept_ingest, concept_merge, concept_compounding
 
 # --- raw sources: let the driving agent do the distillation -----------------
 
-def source_discover(directory: str = "data") -> str:
+def source_discover(directory: str = "") -> str:
     """Find clinical databases (.db/.sqlite) and pg_dump files (.dump/.sql) and
     report which columns hold the transcript and the clinical note.
 
     Inspect this before reading anything, to confirm the column mapping."""
+    from .config import DATA_DIR  # noqa: PLC0415
     from .sources import discover  # noqa: PLC0415
 
+    directory = directory or str(DATA_DIR)
     return _dump(
         {
             "directory": directory,
@@ -303,14 +305,16 @@ def source_discover(directory: str = "data") -> str:
     )
 
 
-def source_read(directory: str = "data", file: str = "", limit: int = 5,
+def source_read(directory: str = "", file: str = "", limit: int = 5,
                 offset: int = 0) -> str:
     """Read raw encounters as {id, transcript, notes}.
 
     Distil each one yourself, then call `concept_ingest` per reasoning pattern
     found. Read in small batches - transcripts are long."""
+    from .config import DATA_DIR  # noqa: PLC0415
     from .sources import discover, extract  # noqa: PLC0415
 
+    directory = directory or str(DATA_DIR)
     sources = [s for s in discover(directory) if s.usable]
     if file:
         sources = [s for s in sources if s.path.name == file or str(s.path) == file]

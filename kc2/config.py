@@ -20,7 +20,11 @@ BASE_DIR = _path("KC_BASE_DIR", REPO_ROOT)
 VAULT_DIR = _path("KC_VAULT_DIR", BASE_DIR / "vault")
 ATOMIC_DIR = _path("KC_ATOMIC_DIR", VAULT_DIR / "atomic")
 COMPILED_DIR = _path("KC_COMPILED_DIR", VAULT_DIR / "compiled")
+CONCEPTS_DIR = _path("KC_CONCEPTS_DIR", VAULT_DIR / "concepts")
 NORMS_DIR = _path("KC_NORMS_DIR", REPO_ROOT / "norms")
+# Raw clinical sources. Anchored to the project root, not the working directory,
+# so nothing depends on where the agent happens to be when it runs.
+DATA_DIR = _path("KC_DATA_DIR", REPO_ROOT / "data")
 
 # Inference. Defaults to the local llama-server so PHI never leaves the box.
 BASE_URL = os.getenv("KC_BASE_URL", "http://localhost:8000/v1")

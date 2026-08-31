@@ -36,7 +36,7 @@ def main(argv: list[str] | None = None) -> int:
     ns.add_argument("--stale", action="store_true", help="only those past re-verification")
 
     im = sub.add_parser("sources", help="inspect raw clinical databases and dumps")
-    im.add_argument("directory", nargs="?", default="data")
+    im.add_argument("directory", nargs="?", default=None)
     im.add_argument("--preview", type=int, default=0, help="show N extracted records")
 
     a = p.parse_args(argv)
@@ -90,11 +90,13 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     if a.cmd == "sources":
+        from .config import DATA_DIR
         from .sources import discover, extract
 
-        found = discover(a.directory)
+        directory = a.directory or DATA_DIR
+        found = discover(directory)
         if not found:
-            print(f"no clinical sources found in {a.directory!r}", file=sys.stderr)
+            print(f"no clinical sources found in {str(directory)!r}", file=sys.stderr)
             print("place .db / .sqlite / .dump / .sql files there", file=sys.stderr)
             return 1
         for src in found:

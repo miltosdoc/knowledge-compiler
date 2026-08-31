@@ -12,14 +12,16 @@ from __future__ import annotations
 from pathlib import Path
 
 from . import config
+from .embed import cosine, get_embedder, rrf
 from .index import BM25, canonicalize, load_notes, normalize
 from .schema import Note
 
 GRAPH_DECAY = 0.45
+DENSE_CACHE = ".kc2_embeddings.json"
 
 
 class Retriever:
-    def __init__(self, atomic_dir: Path | None = None):
+    def __init__(self, atomic_dir: Path | None = None, dense: bool = True):
         self.notes: dict[str, Note] = load_notes(atomic_dir)
         self.adjacency, self.alias, self.links_resolved, self.links_dangling = canonicalize(
             self.notes
@@ -29,12 +31,47 @@ class Retriever:
             for t, n in self.notes.items()
         }
         self.bm25 = BM25(docs)
+        self._dir = Path(atomic_dir or config.ATOMIC_DIR)
+        self.embedder = get_embedder() if dense else None
+        self._vectors: dict[str, list[float]] = {}
+        if self.embedder is not None and self.embedder.available:
+            self._load_or_build_vectors()
+
+    # -- dense -------------------------------------------------------------
+    def _load_or_build_vectors(self) -> None:
+        """Embed each note once and cache to disk, keyed by content hash."""
+        import hashlib
+        import json
+
+        payload = {t: f"{t}. {n.content}" for t, n in self.notes.items()}
+        digest = hashlib.sha256(
+            "\x00".join(f"{k}\x01{v}" for k, v in sorted(payload.items())).encode()
+        ).hexdigest()
+
+        cache = self._dir / DENSE_CACHE
+        if cache.exists():
+            try:
+                blob = json.loads(cache.read_text())
+                if blob.get("digest") == digest:
+                    self._vectors = blob["vectors"]
+                    return
+            except Exception:
+                pass
+
+        titles = list(payload)
+        vecs = self.embedder.encode([payload[t] for t in titles])
+        self._vectors = dict(zip(titles, vecs))
+        try:
+            cache.write_text(json.dumps({"digest": digest, "vectors": self._vectors}))
+        except OSError:
+            pass
 
     # -- stats -------------------------------------------------------------
     def stats(self) -> dict:
         edges = sum(len(v) for v in self.adjacency.values()) // 2
         return {
             "notes": len(self.notes),
+            "dense_backend": self.embedder.name if self.embedder else "none",
             "edges": edges,
             "links_resolved": self.links_resolved,
             "links_dangling": self.links_dangling,
@@ -45,18 +82,28 @@ class Retriever:
 
     # -- retrieval ---------------------------------------------------------
     def _dense_scores(self, query: str) -> dict[str, float]:
-        """Placeholder for the dense half of hybrid retrieval."""
-        return {}
+        if not self._vectors or self.embedder is None:
+            return {}
+        qv = self.embedder.encode_query(query)
+        return {t: cosine(qv, v) for t, v in self._vectors.items()}
 
     def retrieve(self, query: str, k: int = 12, hops: int = 1) -> list[tuple[str, float]]:
         lexical = self.bm25.score(normalize(query))
-        if not lexical:
+        dense = self._dense_scores(query)
+        if not lexical and not dense:
             return []
-        top = max(lexical.values())
-        fused: dict[str, float] = {t: s / top for t, s in lexical.items()}
 
-        for title, score in self._dense_scores(query).items():
-            fused[title] = max(fused.get(title, 0.0), score)
+        if dense:
+            # Reciprocal rank fusion: cosine and BM25 live on incompatible scales,
+            # so combine their ORDERINGS rather than their magnitudes.
+            lex_rank = [t for t, _ in sorted(lexical.items(), key=lambda x: -x[1])]
+            den_rank = [t for t, _ in sorted(dense.items(), key=lambda x: -x[1])]
+            raw = rrf([lex_rank, den_rank])
+        else:
+            raw = dict(lexical)
+
+        top = max(raw.values())
+        fused: dict[str, float] = {t: s / top for t, s in raw.items()}
 
         seeds = [t for t, _ in sorted(fused.items(), key=lambda x: -x[1])[:k]]
         for depth in range(1, hops + 1):

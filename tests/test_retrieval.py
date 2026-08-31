@@ -95,3 +95,31 @@ def test_compiled_prompt_corrects_a_retired_parameter(vault):
     assert out.prompt.index("SUPERSEDED") < out.prompt.index("###"), (
         "corrections must appear above the notes, where they cannot be missed"
     )
+
+
+# --- dense retrieval -------------------------------------------------------
+
+def _dense_available() -> bool:
+    from kc2.embed import get_embedder
+
+    return get_embedder().available
+
+
+@pytest.mark.skipif(not _dense_available(), reason="no embedding backend installed")
+def test_dense_backend_is_reported_in_stats(vault):
+    assert Retriever(vault).stats()["dense_backend"] != "none"
+
+
+@pytest.mark.skipif(not _dense_available(), reason="no embedding backend installed")
+def test_paraphrase_with_no_lexical_overlap_still_retrieves(vault):
+    """The case lexical search cannot serve: a query sharing no content words
+    with the note it should return."""
+    hits = Retriever(vault).retrieve("chest tightness brought on by walking uphill", k=3)
+    titles = [t for t, _ in hits]
+    assert any("Exertional" in t or "Angina" in t for t in titles), titles
+
+
+@pytest.mark.skipif(not _dense_available(), reason="no embedding backend installed")
+def test_embeddings_are_cached_between_retrievers(vault):
+    Retriever(vault)
+    assert (vault / ".kc2_embeddings.json").exists()

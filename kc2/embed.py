@@ -24,21 +24,40 @@ class Embedder:
     def encode(self, texts: Sequence[str]) -> list[list[float]]:  # pragma: no cover
         raise NotImplementedError
 
+    def encode_query(self, text: str) -> list[float]:
+        return self.encode([text])[0]
+
 
 class SentenceTransformerEmbedder(Embedder):
     name = "sentence-transformers"
+
+    #: BGE-family models are trained with an asymmetric retrieval objective: the
+    #: query carries an instruction prefix and the passage does not. Encoding both
+    #: sides identically collapses the score range - measured on this corpus, a
+    #: query for "refractory angina" then ranked a *vagal AFib* note top, because
+    #: raw cosine could not separate 0.786 from 0.779. With the prefix applied the
+    #: same query returns the vasospastic and recurrent-angina notes instead.
+    QUERY_PREFIX = "Represent this sentence for searching relevant passages: "
 
     def __init__(self, model: str = "BAAI/bge-small-en-v1.5"):
         try:
             from sentence_transformers import SentenceTransformer  # noqa: PLC0415
 
             self._m = SentenceTransformer(model)
+            self.model_name = model
             self.available = True
         except Exception:
             self.available = False
 
     def encode(self, texts: Sequence[str]) -> list[list[float]]:
-        return [list(map(float, v)) for v in self._m.encode(list(texts), normalize_embeddings=True)]
+        vecs = self._m.encode(
+            list(texts), normalize_embeddings=True, batch_size=32, show_progress_bar=False
+        )
+        return [list(map(float, v)) for v in vecs]
+
+    def encode_query(self, text: str) -> list[float]:
+        prefix = self.QUERY_PREFIX if "bge" in getattr(self, "model_name", "").lower() else ""
+        return self.encode([prefix + text])[0]
 
 
 class OpenAICompatEmbedder(Embedder):
@@ -77,15 +96,28 @@ class OpenAICompatEmbedder(Embedder):
         return [d["embedding"] for d in data["data"]]
 
 
-def get_embedder() -> Embedder:
+_CACHED: Embedder | None = None
+
+
+def get_embedder(refresh: bool = False) -> Embedder:
+    """Return the first available backend.
+
+    Model loading dominates startup, so the resolved backend is memoised for the
+    life of the process - a Retriever built per request must not reload weights.
+    """
+    global _CACHED
+    if _CACHED is not None and not refresh:
+        return _CACHED
     for factory in (SentenceTransformerEmbedder, OpenAICompatEmbedder):
         try:
             e = factory()
             if e.available:
+                _CACHED = e
                 return e
         except Exception:
             continue
-    return Embedder()
+    _CACHED = Embedder()
+    return _CACHED
 
 
 def cosine(a: Sequence[float], b: Sequence[float]) -> float:

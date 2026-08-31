@@ -1,6 +1,7 @@
 # Clinical content never enters this repository.
 # Distilled notes retain comorbidity chains and verbatim patient phrasing.
 vault/
+.kc2_embeddings.json
 *.sql
 *.zip
 

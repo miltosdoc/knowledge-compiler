@@ -276,3 +276,54 @@ def concept_compounding() -> str:
 
 
 TOOLS += [concept_candidates, concept_ingest, concept_merge, concept_compounding]
+
+
+# --- raw sources: let the driving agent do the distillation -----------------
+
+def source_discover(directory: str = "data") -> str:
+    """Find clinical databases (.db/.sqlite) and pg_dump files (.dump/.sql) and
+    report which columns hold the transcript and the clinical note.
+
+    Inspect this before reading anything, to confirm the column mapping."""
+    from .sources import discover  # noqa: PLC0415
+
+    return _dump(
+        {
+            "directory": directory,
+            "sources": [
+                {
+                    "file": str(s.path), "kind": s.kind, "table": s.table,
+                    "rows": s.rows, "id_column": s.id_col,
+                    "transcript_column": s.transcript_col, "note_column": s.note_col,
+                    "columns": s.columns, "usable": s.usable,
+                }
+                for s in discover(directory)
+            ],
+        }
+    )
+
+
+def source_read(directory: str = "data", file: str = "", limit: int = 5,
+                offset: int = 0) -> str:
+    """Read raw encounters as {id, transcript, notes}.
+
+    Distil each one yourself, then call `concept_ingest` per reasoning pattern
+    found. Read in small batches - transcripts are long."""
+    from .sources import discover, extract  # noqa: PLC0415
+
+    sources = [s for s in discover(directory) if s.usable]
+    if file:
+        sources = [s for s in sources if s.path.name == file or str(s.path) == file]
+    if not sources:
+        return _dump({"error": "no usable source found", "directory": directory})
+    src = sources[0]
+    records = extract(src, limit=offset + limit)[offset:]
+    return _dump(
+        {
+            "file": str(src.path), "table": src.table,
+            "offset": offset, "returned": len(records), "records": records,
+        }
+    )
+
+
+TOOLS += [source_discover, source_read]

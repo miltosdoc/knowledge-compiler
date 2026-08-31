@@ -116,6 +116,22 @@ parameter reaching an answer fails the build rather than surfacing months later 
 pytest tests/
 ```
 
+## Getting data in
+
+Place source databases in `data/` — SQLite (`.db`, `.sqlite`) or pg_dump
+(`.dump`, `.sql`). Both `data/` and `vault/` are excluded from version control.
+
+```bash
+kc2 sources data/ --preview 3
+```
+
+Discovery is introspective: it reports each table it found and which columns it
+believes hold the transcript and the clinical note, so the mapping can be
+confirmed before anything is ingested. An agent driving the MCP server reads
+encounters through `source_read`, distils each one itself, and calls
+`concept_ingest` per reasoning pattern — the model already in the loop does the
+extraction, and no clinical text is sent anywhere else.
+
 ## Clinical data
 
 No clinical content belongs in this repository. Distilled notes retain comorbidity

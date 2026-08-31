@@ -35,6 +35,10 @@ def main(argv: list[str] | None = None) -> int:
     ns = sub.add_parser("norms", help="list the norms layer")
     ns.add_argument("--stale", action="store_true", help="only those past re-verification")
 
+    im = sub.add_parser("sources", help="inspect raw clinical databases and dumps")
+    im.add_argument("directory", nargs="?", default="data")
+    im.add_argument("--preview", type=int, default=0, help="show N extracted records")
+
     a = p.parse_args(argv)
 
     if a.cmd == "stats":
@@ -83,6 +87,26 @@ def main(argv: list[str] | None = None) -> int:
             print(f"  {k:26} {v}")
         for sup in norm.supersedes:
             print(f"  supersedes {sup.get('name')}: {str(sup.get('migration','')).strip()[:120]}")
+        return 0
+
+    if a.cmd == "sources":
+        from .sources import discover, extract
+
+        found = discover(a.directory)
+        if not found:
+            print(f"no clinical sources found in {a.directory!r}", file=sys.stderr)
+            print("place .db / .sqlite / .dump / .sql files there", file=sys.stderr)
+            return 1
+        for src in found:
+            print(src.describe())
+            print()
+        if a.preview:
+            usable = [s for s in found if s.usable]
+            if usable:
+                print(f"--- preview of {usable[0].path.name} ---")
+                for rec in extract(usable[0], limit=a.preview):
+                    print(f"  [{rec['id']}] {rec['transcript'][:90]!r}")
+                    print(f"          note: {rec['notes'][:70]!r}")
         return 0
 
     if a.cmd == "norms":

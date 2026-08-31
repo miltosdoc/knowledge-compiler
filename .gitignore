@@ -2,8 +2,25 @@
 # Distilled notes retain comorbidity chains and verbatim patient phrasing.
 vault/
 .kc2_embeddings.json
+
+# Raw clinical sources. Database dumps and sqlite files are PHI in bulk.
+# Keep them OUTSIDE this working tree entirely; these patterns are a backstop,
+# not the plan.
 *.sql
+*.dump
+*.dmp
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite3
+*.bak
 *.zip
+*.tar
+*.tar.gz
+raw/
+data/
+transcripts/
 
 .env
 venv/

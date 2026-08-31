@@ -121,11 +121,15 @@ class ConceptStore:
         return f"{c.title}. {c.content}"
 
     def _embed_all(self) -> None:
+        if not self.embedder.available:
+            return
         ids = list(self.concepts)
         vecs = self.embedder.encode([self._text(self.concepts[i]) for i in ids])
         self._vectors = dict(zip(ids, vecs))
 
-    def _embed_one(self, c: Concept) -> list[float]:
+    def _embed_one(self, c: Concept) -> list[float] | None:
+        if not self.embedder.available:
+            return None
         return self.embedder.encode([self._text(c)])[0]
 
     # -- resolution --------------------------------------------------------
@@ -185,7 +189,9 @@ class ConceptStore:
                     target.tags.append(t)
             if write:
                 save_concept(self.dir, target)
-            self._vectors[cid] = self._embed_one(target)
+            vec = self._embed_one(target)
+            if vec is not None:
+                self._vectors[cid] = vec
             return IngestResult("merge", cid, score, target.title)
 
         cid = slugify(title)
@@ -213,7 +219,9 @@ class ConceptStore:
                         save_concept(self.dir, other)
 
         self.concepts[cid] = concept
-        self._vectors[cid] = self._embed_one(concept)
+        vec = self._embed_one(concept)
+        if vec is not None:
+            self._vectors[cid] = vec
         if write:
             save_concept(self.dir, concept)
         return IngestResult(action, cid, related[0][0] if related else 0.0, matched)
@@ -226,8 +234,9 @@ class ConceptStore:
         keep.absorb(gone)
         self.concepts.pop(absorb_id, None)
         self._vectors.pop(absorb_id, None)
-        if self.embedder.available:
-            self._vectors[keep_id] = self._embed_one(keep)
+        vec = self._embed_one(keep)
+        if vec is not None:
+            self._vectors[keep_id] = vec
         if write:
             save_concept(self.dir, keep)
             path = self.dir / f"{absorb_id}.md"
@@ -254,7 +263,9 @@ class ConceptStore:
                 if t not in target.tags:
                     target.tags.append(t)
             save_concept(self.dir, target)
-            self._vectors[target_id] = self._embed_one(target)
+            vec = self._embed_one(target)
+            if vec is not None:
+                self._vectors[target_id] = vec
             return IngestResult("merge", target_id, result.score, target.title)
         return self.ingest(
             title, content, source, observed_on, detail, tags, adjudicator=False

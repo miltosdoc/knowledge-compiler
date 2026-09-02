@@ -4,6 +4,12 @@ Reinstates the five v1 tools (signatures recovered from Hermes request dumps
 after ``knowledge_mcp_server.py`` was lost with the Mac mini) and adds the norm
 tools that make read-time resolution possible.
 
+Protocol layer (2026-09-02): every tool result carries a ``protocol`` object
+(see ``protocol.py``) so a fresh agent with no memory inherits the operating
+contract from the output itself. ``session_brief`` makes the start-of-case
+interview a tool, and thin-context calls get an ``ask_next`` block telling
+the agent what to ask before relying on the answer.
+
 ``mcp`` is imported lazily so the rest of the package - and the test suite -
 works without it installed.
 """
@@ -14,6 +20,9 @@ from typing import Any
 
 from .compile import Compiler
 from .norms import NormStore
+from . import protocol as _protocol
+from .protocol import protocol_block
+from .protocol import session_brief
 
 _compiler: Compiler | None = None
 _norms: NormStore | None = None
@@ -56,6 +65,7 @@ def intuition_search(query: str, limit: int = 10) -> str:
                 }
                 for t, s in hits
             ],
+            "protocol": protocol_block(checkpoint=True),
         }
     )
 
@@ -73,6 +83,7 @@ def intuition_get_note(title: str) -> str:
             "content": note.content,
             "links": getattr(note, "links_resolved", []),
             "superseded_parameters": _n().audit_text(note.content),
+            "protocol": protocol_block(),
         }
     )
 
@@ -80,24 +91,42 @@ def intuition_get_note(title: str) -> str:
 def intuition_neighbors(concept: str, depth: int = 1) -> str:
     """Get neighbouring concepts in the knowledge graph."""
     return _dump(
-        {"concept": concept, "depth": depth, "neighbors": _c().retriever.neighbors(concept, depth)}
-    )
-
-
-def intuition_compile(seed: str, max_tokens: int = 8000) -> str:
-    """Compile a reasoning module for a seed concept or a whole case description."""
-    r = _c().compile(seed, max_tokens=max_tokens)
-    return _dump(
         {
-            "seed": seed,
-            "compiled_prompt": r.prompt,
-            "concepts": len(r.concepts),
-            "estimated_tokens": r.estimated_tokens,
-            "corrections": r.corrections,
-            "norm_refs": r.norm_refs,
-            "unverified_values": r.unverified_values,
+            "concept": concept,
+            "depth": depth,
+            "neighbors": _c().retriever.neighbors(concept, depth),
+            "protocol": protocol_block(),
         }
     )
+
+
+def intuition_compile(
+    seed: str, context: dict[str, Any] | None = None, max_tokens: int = 8000
+) -> str:
+    """Compile a reasoning module for a seed concept or a whole case description.
+
+    `context` (optional): what is already known about the case — e.g.
+    ``{"age": "68", "duration": "2 weeks, worsening", "meds": "metoprolol
+    50 mg", "workup": "rest ECG normal"}``. When omitted or empty, the result
+    carries an ``ask_next`` block: the case is being answered on thin
+    context, so put the missing pieces to the patient/owner before relying
+    on this output."""
+    r = _c().compile(seed, max_tokens=max_tokens)
+    missing = _protocol._missing_context(context)
+    payload: dict[str, Any] = {
+        "seed": seed,
+        "compiled_prompt": r.prompt,
+        "concepts": len(r.concepts),
+        "estimated_tokens": r.estimated_tokens,
+        "corrections": r.corrections,
+        "norm_refs": r.norm_refs,
+        "unverified_values": r.unverified_values,
+    }
+    if missing:
+        payload["ask_next"] = _protocol._CONTEXTUAL_MSG
+        payload["missing_context"] = missing
+    payload["protocol"] = protocol_block()
+    return _dump(payload)
 
 
 def intuition_graph_stats() -> str:
@@ -108,6 +137,7 @@ def intuition_graph_stats() -> str:
         {
             "norms": len(ns.norms),
             "stale_norms": [n.id for n in ns.stale()],
+            "protocol": protocol_block(),
         }
     )
     return _dump(s)
@@ -122,7 +152,8 @@ def norm_lookup(norm_id: str) -> str:
         n, asked_retired = _n().resolve_name(norm_id)
     if n is None:
         return _dump({"error": "no such norm", "norm_id": norm_id,
-                      "action": "state that the norm is missing; do NOT answer from memory"})
+                      "action": "state that the norm is missing; do NOT answer from memory",
+                      "protocol": protocol_block()})
     return _dump(
         {
             "id": n.id,
@@ -145,6 +176,7 @@ def norm_lookup(norm_id: str) -> str:
                 if asked_retired
                 else {}
             ),
+            "protocol": protocol_block(),
         }
     )
 
@@ -159,11 +191,13 @@ def norm_search(query: str, limit: int = 5) -> str:
                  "stale": n.is_stale()}
                 for n in _n().search(query, limit)
             ],
+            "protocol": protocol_block(),
         }
     )
 
 
 TOOLS = [
+    session_brief,
     intuition_search,
     intuition_get_note,
     intuition_neighbors,
@@ -172,6 +206,33 @@ TOOLS = [
     norm_lookup,
     norm_search,
 ]
+
+
+SERVER_INSTRUCTIONS = """\
+kc2 is the distilled reasoning graph of one cardiologist (Dr Triantafyllou,
+Hjartcentrum Halland / Pulsus Hem EKG, Varberg, Sweden): ~5,600 concepts
+from 2,100+ encounters, plus a norms layer of authoritative parameter values.
+
+HOW TO DRIVE THIS SERVER
+1. New patient case -> call `session_brief` first. It returns the interview
+   (age, duration/trend, meds, prior workup, goal) and a coverage score.
+   Ask the missing items to the patient/owner, then `intuition_compile` with
+   the full picture.
+2. A patient CALLING with symptoms is a TRIAGE call: `intuition_compile` on
+   the case, answer with red-flag questions (syncope, rest pain, dyspnoea,
+   palpitations), suggest the clinic contact path. Admin messages (booking,
+   result follow-up, complaints) are process questions - no compile needed.
+3. Numbers: NEVER state a threshold, dose, target or score from memory.
+   `norm_lookup` is the only sanctioned source. Missing norm -> say so.
+4. Notes are historical evidence of past reasoning, not current guidance.
+
+LANGUAGE & ROLE RULES (patient-facing Swedish text)
+- Name the ROLE, never the physician: 'läkaren', 'sjuksköterskan',
+  'personalen'. Exceptions: signature line, legal/insurance documents,
+  prescriptions.
+- Keep it short, warm, concrete. Swedish for patients; this protocol speaks
+  English to the agent.
+"""
 
 
 def create_server():
@@ -185,9 +246,34 @@ def create_server():
     except ImportError:  # mcp 1.x
         from mcp.server.fastmcp import FastMCP as _Server  # noqa: PLC0415
 
-    server = _Server("knowledge-compiler")
+    server = _Server(
+        "knowledge-compiler",
+        instructions=SERVER_INSTRUCTIONS,
+    )
+    # TOOLS is fully populated by the time create_server() is called: the
+    # module appends the concept- and source-family tools at the end, so a
+    # single loop covers all 14.
     for fn in TOOLS:
         server.tool()(fn)
+
+    @server.prompt()
+    def start_guidance() -> str:
+        """Start-of-case briefing: how to interview before compiling."""
+        return session_brief(None)
+
+    @server.prompt()
+    def role_rules() -> str:
+        """Swedish role-naming rules for patient-facing text."""
+        return (
+            "Patient-facing Swedish: name the ROLE, never the physician.\n"
+            "- decision/key fact -> 'läkaren'\n"
+            "- nurse tasks (reminders, instructions, follow-up calls) -> "
+            "'sjuksköterskan'\n"
+            "- clinic facilities (scheduling, reception) -> 'personalen'\n"
+            "Exception: signature line, legal/insurance documents, prescriptions.\n"
+            "Short, warm, concrete. No 'Dr Triantafyllou' in the body."
+        )
+
     return server
 
 
@@ -227,6 +313,7 @@ def concept_candidates(title: str, content: str = "", limit: int = 5) -> str:
                  "strength": _s().concepts[cid].strength}
                 for score, cid in _s().nearest(title, content, n=limit)
             ],
+            "protocol": protocol_block(),
         }
     )
 
@@ -254,6 +341,7 @@ def concept_ingest(
             )
             if r.action == "ambiguous"
             else None,
+            "protocol": protocol_block(),
         }
     )
 
@@ -263,7 +351,8 @@ def concept_merge(keep_id: str, absorb_id: str) -> str:
     ok = _s().merge(keep_id, absorb_id)
     return _dump(
         {"merged": ok, "keep": keep_id, "absorbed": absorb_id,
-         "strength": _s().concepts[keep_id].strength if ok else None}
+         "strength": _s().concepts[keep_id].strength if ok else None,
+         "protocol": protocol_block()}
     )
 
 
@@ -272,7 +361,9 @@ def concept_compounding() -> str:
 
     Evidence per concept should rise as encounters accrue. If concept count grows
     in step with transcripts, knowledge is being appended rather than integrated."""
-    return _dump(_s().compounding())
+    out = _s().compounding()
+    out["protocol"] = protocol_block()
+    return _dump(out)
 
 
 TOOLS += [concept_candidates, concept_ingest, concept_merge, concept_compounding]
@@ -301,6 +392,7 @@ def source_discover(directory: str = "") -> str:
                 }
                 for s in discover(directory)
             ],
+            "protocol": protocol_block(),
         }
     )
 
@@ -326,6 +418,7 @@ def source_read(directory: str = "", file: str = "", limit: int = 5,
         {
             "file": str(src.path), "table": src.table,
             "offset": offset, "returned": len(records), "records": records,
+            "protocol": protocol_block(),
         }
     )
 
